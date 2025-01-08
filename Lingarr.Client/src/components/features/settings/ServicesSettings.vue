@@ -32,6 +32,7 @@ import FreeServiceConfig from '@/components/features/settings/services/FreeServi
 import AnthropicConfig from '@/components/features/settings/services/AnthropicConfig.vue'
 import OpenAiConfig from '@/components/features/settings/services/OpenAiConfig.vue'
 import LocalAiConfig from '@/components/features/settings/services/LocalAiConfig.vue'
+import CustomConfig from "@/components/features/settings/services/CustomConfig.vue";
 
 const saveNotification = ref<InstanceType<typeof SaveNotification> | null>(null)
 const settingsStore = useSettingStore()
@@ -53,7 +54,8 @@ const serviceOptions = [
     { value: 'yandex', label: 'Yandex' },
     { value: 'openai', label: 'OpenAI' },
     { value: 'anthropic', label: 'Anthropic' },
-    { value: 'localai', label: 'Local AI' }
+    { value: 'localai', label: 'Local AI' },
+    { value: 'custom', label: 'Custom Service' }
 ]
 
 const serviceConfigComponent = computed(() => {
@@ -68,6 +70,8 @@ const serviceConfigComponent = computed(() => {
             return LocalAiConfig
         case 'deepl':
             return DeepLConfig
+        case 'custom':
+            return CustomConfig
         case 'google':
         case 'bing':
         case 'microsoft':

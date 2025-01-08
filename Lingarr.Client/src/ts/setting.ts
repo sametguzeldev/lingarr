@@ -25,7 +25,8 @@ export const SETTINGS = {
     LOCAL_AI_ENDPOINT: 'local_ai_endpoint',
     LOCAL_AI_MODEL: 'local_ai_model',
     LOCAL_AI_API_KEY: 'local_ai_api_key',
-    AI_PROMPT: 'ai_prompt'
+    AI_PROMPT: 'ai_prompt',
+    CUSTOM_ENDPOINT: 'custom_endpoint',
 } as const
 
 export interface ISettings {
@@ -54,4 +55,5 @@ export interface ISettings {
     local_ai_model: string
     local_ai_api_key: string
     ai_prompt: string
+    custom_endpoint: string
 }

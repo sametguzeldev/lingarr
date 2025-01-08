@@ -36,6 +36,11 @@ public static class SettingKeys
             public const string Endpoint = "local_ai_endpoint";
             public const string ApiKey = "local_ai_api_key";
         }
+        
+        public static class Custom
+        {
+            public const string Endpoint = "custom_endpoint";
+        }
 
         public const string LibreTranslateUrl = "libretranslate_url";
         public const string SourceLanguages = "source_languages";

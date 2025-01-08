@@ -14,6 +14,12 @@ public class GenerateResponse
     public bool Done { get; set; }
 }
 
+public class CustomServiceResponse
+{
+    [JsonPropertyName("translated_text")] 
+    public string TranslatedText { get; set; } = string.Empty;
+}
+
 public class ChatResponse
 {
     [JsonPropertyName("choices")] 
