@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Lingarr.Core.Configuration;
@@ -153,7 +154,7 @@ public class CustomService : BaseLanguageService
     // Helper method to decide if a retry is necessary
     private static bool ShouldRetry(HttpResponseMessage response)
     {
-        // Retry for 5xx status codes or transient network errors
-        return ((int)response.StatusCode >= 500 && (int)response.StatusCode <= 599);
+        return response.StatusCode == HttpStatusCode.TooManyRequests || // 429
+               ((int)response.StatusCode >= 500 && (int)response.StatusCode <= 599); // 5xx
     }
 }
