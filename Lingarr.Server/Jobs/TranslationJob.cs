@@ -43,42 +43,69 @@ public class TranslationJob
         TranslationRequest translationRequest,
         CancellationToken cancellationToken)
     {
-        var request = await _translationRequestService.UpdateTranslationRequest(translationRequest,
-            context.BackgroundJob.Id,
-            TranslationStatus.InProgress);
-
-        _logger.LogInformation("TranslateJob started for subtitle: |Green|{filePath}|/Green|",
-            translationRequest.SubtitleToTranslate);
-
-        var serviceType = await _settings.GetSetting("service_type") ?? "libretranslate";
-        var translationService = _translationServiceFactory.CreateTranslationService(serviceType);
-        var subtitleTranslator = new SubtitleTranslationService(translationService, _logger, _progressService);
-
-        var subtitles = await _subtitleService.ReadSubtitles(request.SubtitleToTranslate);
-        var translatedSubtitles =
-            await subtitleTranslator.TranslateSubtitles(subtitles, request, cancellationToken);
-
-        if (cancellationToken.IsCancellationRequested)
+        try
         {
-            _logger.LogInformation("Translation cancelled for subtitle: {subtitlePath}",
-                request.SubtitleToTranslate);
-            
-            request.CompletedAt = DateTime.UtcNow;
-            request.Status = TranslationStatus.Cancelled;
-            await _dbContext.SaveChangesAsync();
-            
-            await _translationRequestService.UpdateActiveCount();
-            await _progressService.Emit(request, 0, false);
-            return;
+            var request = await _translationRequestService.UpdateTranslationRequest(translationRequest,
+                context.BackgroundJob.Id,
+                TranslationStatus.InProgress);
+
+            _logger.LogInformation("TranslateJob started for subtitle: |Green|{filePath}|/Green|",
+                translationRequest.SubtitleToTranslate);
+
+            var serviceType = await _settings.GetSetting("service_type") ?? "libretranslate";
+            var translationService = _translationServiceFactory.CreateTranslationService(serviceType);
+            var subtitleTranslator = new SubtitleTranslationService(translationService, _logger, _progressService);
+
+            var subtitles = await _subtitleService.ReadSubtitles(request.SubtitleToTranslate);
+            var translatedSubtitles =
+                await subtitleTranslator.TranslateSubtitles(subtitles, request, cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Translation cancelled for subtitle: {subtitlePath}",
+                    request.SubtitleToTranslate);
+
+                request.CompletedAt = DateTime.UtcNow;
+                request.Status = TranslationStatus.Cancelled;
+                await _dbContext.SaveChangesAsync();
+
+                await _translationRequestService.UpdateActiveCount();
+                await _progressService.Emit(request, 0, false);
+                return;
+            }
+
+            var outputPath = _subtitleService.CreateFilePath(
+                request.SubtitleToTranslate,
+                request.TargetLanguage);
+
+            await _subtitleService.WriteSubtitles(outputPath, translatedSubtitles);
+
+            _logger.LogInformation("TranslateJob completed and created subtitle: |Green|{filePath}|/Green|",
+                outputPath);
+            await _progressService.Emit(request, 100, true);
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred during the translation job for subtitle: {filePath}",
+                translationRequest.SubtitleToTranslate);
 
-        var outputPath = _subtitleService.CreateFilePath(
-            request.SubtitleToTranslate,
-            request.TargetLanguage);
-        
-        await _subtitleService.WriteSubtitles(outputPath, translatedSubtitles);
+            // Check the number of remaining retries
+            var retryCount = context.GetJobParameter<int>("RetryCount"); // Current retry count
+            var maxRetries = context.GetJobParameter<int>("MaxRetryCount"); // Max retries allowed
 
-        _logger.LogInformation("TranslateJob completed and created subtitle: |Green|{filePath}|/Green|", outputPath);
-        await _progressService.Emit(request, 100, true);
+            if (retryCount >= maxRetries)
+            {
+                // This is the last retry attempt; mark the translation request as failed
+                var failedRequest = await _translationRequestService.UpdateTranslationRequest(
+                    translationRequest,
+                    context.BackgroundJob.Id,
+                    TranslationStatus.Failed);
+
+                failedRequest.CompletedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+            }
+
+            throw; // Rethrow the exception to allow Hangfire to retry
+        }
     }
 }
