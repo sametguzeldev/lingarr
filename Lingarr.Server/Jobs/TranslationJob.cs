@@ -56,7 +56,7 @@ public class TranslationJob
             _logger.LogInformation("TranslateJob started for subtitle: |Green|{filePath}|/Green|",
                 translationRequest.SubtitleToTranslate);
             await SendNotificationToNtfy(
-                $"The translation job has started for {translationRequest.SubtitleToTranslate}.", "info");
+                $"The translation job has started for {translationRequest.Title}.", "info");
 
             var serviceType = await _settings.GetSetting("service_type") ?? "libretranslate";
             var translationService = _translationServiceFactory.CreateTranslationService(serviceType);
@@ -79,7 +79,7 @@ public class TranslationJob
                 await _progressService.Emit(request, 0, false);
 
                 await SendNotificationToNtfy(
-                    $"The translation job was cancelled for {translationRequest.SubtitleToTranslate}.",
+                    $"The translation job was cancelled for {translationRequest.Title}.",
                     "warning");
                 return;
             }
@@ -96,7 +96,7 @@ public class TranslationJob
 
             // Send notification on successful completion
             await SendNotificationToNtfy(
-                $"The translation job for {translationRequest.SubtitleToTranslate} was completed successfully.",
+                $"The translation job for {translationRequest.Title} was completed successfully.",
                 "info");
         }
         catch (Exception ex)
@@ -119,7 +119,7 @@ public class TranslationJob
 
                 // Send notification on failure
                 await SendNotificationToNtfy(
-                    $"The translation job for {translationRequest.SubtitleToTranslate} failed after {maxRetries} attempts.",
+                    $"The translation job for {translationRequest.Title} failed after {maxRetries} attempts.",
                     "warning");
             }
 
