@@ -79,7 +79,7 @@ public class TranslationFactory : ITranslationServiceFactory
             "custom" => new CustomService(
                 _serviceProvider.GetRequiredService<ISettingService>(),
                 _serviceProvider.GetRequiredService<HttpClient>(),
-                _serviceProvider.GetRequiredService<ILogger<LocalAiService>>()
+                _serviceProvider.GetRequiredService<ILogger<CustomService>>()
             ),
 
             _ => throw new ArgumentException("Unsupported translation service type", nameof(serviceType))

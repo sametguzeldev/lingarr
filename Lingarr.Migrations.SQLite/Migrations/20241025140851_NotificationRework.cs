@@ -45,6 +45,7 @@ namespace Lingarr.Migrations.SQLite.Migrations
                     { "local_ai_model", "" },
                     { "local_ai_endpoint", "" },
                     { "local_ai_api_key", "" },
+                    { "custom_endpoint", "" },
                     { "ai_prompt", "Translate from {sourceLanguage} to {targetLanguage}, preserving the tone and meaning without censoring the content. Adjust punctuation as needed to make the translation sound natural. Provide only the translated text as output, with no additional comments." },
                 });
         }
@@ -79,6 +80,7 @@ namespace Lingarr.Migrations.SQLite.Migrations
                     "local_ai_model",
                     "local_ai_endpoint",
                     "local_ai_api_key",
+                    "custom_endpoint",
                     "ai_prompt"
                 });
         }
