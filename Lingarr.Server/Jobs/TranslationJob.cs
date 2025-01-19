@@ -1,4 +1,5 @@
-﻿using Hangfire;
+﻿using System.Text;
+using Hangfire;
 using Hangfire.Server;
 using Lingarr.Core.Data;
 using Lingarr.Core.Entities;
@@ -18,6 +19,7 @@ public class TranslationJob
     private readonly ISubtitleService _subtitleService;
     private readonly ITranslationServiceFactory _translationServiceFactory;
     private readonly ITranslationRequestService _translationRequestService;
+    private readonly IConfiguration _configuration;
 
     public TranslationJob(
         ILogger<TranslationJob> logger,
@@ -26,7 +28,8 @@ public class TranslationJob
         IProgressService progressService,
         ISubtitleService subtitleService,
         ITranslationServiceFactory translationServiceFactory,
-        ITranslationRequestService translationRequestService)
+        ITranslationRequestService translationRequestService,
+        IConfiguration configuration)
     {
         _logger = logger;
         _settings = settings;
@@ -35,6 +38,7 @@ public class TranslationJob
         _subtitleService = subtitleService;
         _translationServiceFactory = translationServiceFactory;
         _translationRequestService = translationRequestService;
+        _configuration = configuration;
     }
 
     [AutomaticRetry(Attempts = 5)]
@@ -51,6 +55,8 @@ public class TranslationJob
 
             _logger.LogInformation("TranslateJob started for subtitle: |Green|{filePath}|/Green|",
                 translationRequest.SubtitleToTranslate);
+            await SendNotificationToNtfy(
+                $"The translation job has started for {translationRequest.SubtitleToTranslate}.", "info");
 
             var serviceType = await _settings.GetSetting("service_type") ?? "libretranslate";
             var translationService = _translationServiceFactory.CreateTranslationService(serviceType);
@@ -71,6 +77,10 @@ public class TranslationJob
 
                 await _translationRequestService.UpdateActiveCount();
                 await _progressService.Emit(request, 0, false);
+
+                await SendNotificationToNtfy(
+                    $"The translation job was cancelled for {translationRequest.SubtitleToTranslate}.",
+                    "warning");
                 return;
             }
 
@@ -83,19 +93,22 @@ public class TranslationJob
             _logger.LogInformation("TranslateJob completed and created subtitle: |Green|{filePath}|/Green|",
                 outputPath);
             await _progressService.Emit(request, 100, true);
+
+            // Send notification on successful completion
+            await SendNotificationToNtfy(
+                $"The translation job for {translationRequest.SubtitleToTranslate} was completed successfully.",
+                "info");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred during the translation job for subtitle: {filePath}",
                 translationRequest.SubtitleToTranslate);
 
-            // Check the number of remaining retries
-            var retryCount = context.GetJobParameter<int>("RetryCount"); // Current retry count
-            var maxRetries = context.GetJobParameter<int>("MaxRetryCount"); // Max retries allowed
+            int retryCount = context.GetJobParameter<int>("RetryCount");
+            int maxRetries = context.GetJobParameter<int>("MaxRetryCount");
 
             if (retryCount >= maxRetries)
             {
-                // This is the last retry attempt; mark the translation request as failed
                 var failedRequest = await _translationRequestService.UpdateTranslationRequest(
                     translationRequest,
                     context.BackgroundJob.Id,
@@ -103,9 +116,44 @@ public class TranslationJob
 
                 failedRequest.CompletedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
+
+                // Send notification on failure
+                await SendNotificationToNtfy(
+                    $"The translation job for {translationRequest.SubtitleToTranslate} failed after {maxRetries} attempts.",
+                    "warning");
             }
 
             throw; // Rethrow the exception to allow Hangfire to retry
+        }
+    }
+
+    private async Task SendNotificationToNtfy(string message, string tags)
+    {
+        using var client = new HttpClient();
+        const string endpoint = "https://ntfy.cthraxxi.com/lingarr"; // Replace with your ntfy endpoint
+        var token = _configuration["Ntfy:AuthorizationToken"];
+
+        // Add headers
+        client.DefaultRequestHeaders.Add("Title", "Lingarr: AI Translation"); // Add Title header
+        client.DefaultRequestHeaders.Add("Tags", tags); // Add Tags header
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",
+                token); // Add Authorization token
+
+        // The message is sent as the body
+        var content = new StringContent(message, Encoding.UTF8, "text/plain");
+
+        try
+        {
+            var response = await client.PostAsync(endpoint, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to send ntfy notification. Status Code: {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while sending a notification to ntfy.");
         }
     }
 }
