@@ -37,7 +37,7 @@ public class TranslationJob
         _translationRequestService = translationRequestService;
     }
 
-    [AutomaticRetry(Attempts = 0)]
+    [AutomaticRetry(Attempts = 5)]
     public async Task Execute(
         PerformContext context,
         TranslationRequest translationRequest,
